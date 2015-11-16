@@ -6,6 +6,7 @@ library(magrittr)
 library(dplyr)
 library(multitaper)
 library(MASS) # need for pseudoinverse
+library(ggplot2)
 
 data <- read.table("sim_data.txt")
 colnames(data) <- c('H', 'D', 'Z', 'A')
@@ -69,7 +70,18 @@ for(i in 1:length(freq)){
   M_Z[i] <- ginv(F_Z[,i]) %*% F_A[,i]
 }
 
-plot(M_H, type = 'l')
-plot(M_D, type = 'l')
-plot(M_Z, type = 'l')
+
+#plot transfer functions --------------
+
+#combine transfer function data into one data frame with frequency
+tf <- data.frame('freq' = freq, 'H' = M_H, 'D' = M_D, 'Z' = M_Z) %>% 
+  gather(tf, val, 2:4)
+
+#facet plot of all three transfer functions
+ggplot(data = tf, aes(x = freq, y = val)) +
+  facet_grid(tf~.) +
+  geom_line() +
+  labs(title = paste0("Transfer Functions\n Block Length = ", N, " samples"), x = "Frequency", y = "")
+
+  
 
