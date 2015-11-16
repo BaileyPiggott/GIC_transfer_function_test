@@ -6,32 +6,38 @@ library(dplyr)
 library(multitaper)
 library(MASS) # need for pseudoinverse
 
-source("get_tf.R") # function to get transfer function at given freq
-
 data <- read.table("sim_data.txt")
 colnames(data) <- c('H', 'D', 'Z', 'A')
 
 # create periodogram --------------------
-#plot(data$A, type = 'l')
 
-N = 200
-H_1 <- data$H[1:N]
-A_1 <- data$A[1:N]
+# create multiple blocks of the data
+N = 200 # number of data points per block
+#initialize empty matrices where each block is a column
+H_block <- data.frame(matrix(ncol = (nrow(data)/N), nrow = N))
+D_block <- data.frame(matrix(ncol = (nrow(data)/N), nrow = N))
+Z_block <- data.frame(matrix(ncol = (nrow(data)/N), nrow = N))
+A_block <- data.frame(matrix(ncol = (nrow(data)/N), nrow = N))
 
-H_2 <- data$H[(N+1):(2*N)]
-A_2 <- data$A[(N+1):(2*N)]
+spec_H_block <- data.frame(matrix(ncol = (nrow(data)/N), nrow = N))
+spec_D_block <- data.frame(matrix(ncol = (nrow(data)/N), nrow = N))
+spec_Z_block <- data.frame(matrix(ncol = (nrow(data)/N), nrow = N))
+spec_A_block <- data.frame(matrix(ncol = (nrow(data)/N), nrow = N))
 
-H_3 <- data$H[(2*N+1):(3*N)]
-A_3 <- data$A[(2*N+1):(3*N)]
+# create blocks of the data
+for(j in 1:1){#(nrow(data)/N)){
+  H_block[,j]<- data$H[(1+(j-1)*N):(j*N)]
+  D_block[,j]<- data$D[(1+(j-1)*N):(j*N)]
+  Z_block[,j]<- data$Z[(1+(j-1)*N):(j*N)]
+  A_block[,j]<- data$A[(1+(j-1)*N):(j*N)]  
 
-spec_H_1 <- (1/N)*abs(fft(H_1))^2 # spectral estimate
-spec_A_1 <- (1/N)*abs(fft(A_1))^2 # spectral estimate
+#spectral estimate of each block
+ spec_H_block[,j] <- (1/N)*abs(fft(H_block[,j]))^2
+ spec_D_block[,j] <- (1/N)*abs(fft(D_block[,j]))^2
+ spec_Z_block[,j] <- (1/N)*abs(fft(Z_block[,j]))^2
+ spec_A_block[,j] <- (1/N)*abs(fft(A_block[,j]))^2
+}
 
-spec_H_2 <- (1/N)*abs(fft(H_2))^2 # spectral estimate
-spec_A_2 <- (1/N)*abs(fft(A_2))^2 # spectral estimate
-
-spec_H_3 <- (1/N)*abs(fft(H_3))^2 # spectral estimate
-spec_A_3 <- (1/N)*abs(fft(A_3))^2 # spectral estimate
 
 # make transfer function ---------------------
 
