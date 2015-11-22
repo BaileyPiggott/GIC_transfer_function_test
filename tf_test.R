@@ -25,9 +25,11 @@ spec_A_block <- get_spec(sim_data$A, N)
 
 # make transfer function ---------------------
 
-freq <- c(1:(N/2+1)) # frequencies at which to calculate the transfer function
+freq <- seq(1,(N/2+1),2) # frequencies at which to calculate the transfer function
 
 tf <- get_tf_ind(spec_H_block, spec_D_block, spec_Z_block, spec_A_block, freq)
+
+#tf_all <- get_tf_all()
 
 #plot transfer functions ----------------------------
 
@@ -35,7 +37,7 @@ tf <- get_tf_ind(spec_H_block, spec_D_block, spec_Z_block, spec_A_block, freq)
 ggplot(data = tf, aes(x = freq, y = val)) +
   facet_grid(tf~.) +
   geom_line() +
-  labs(title = paste0("Transfer Functions\n Block Length = ", N, " samples"), x = "Frequency", y = "")
+  labs(title = paste0("Transfer Functions\n Block Length = ", N, " samples\n", "Sampled at ", length(freq), " Frequencies"), x = "Frequency", y = "")
 
 
 #facet plot of all three transfer functions
