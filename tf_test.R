@@ -39,7 +39,6 @@ ggplot(data = tf, aes(x = freq, y = val)) +
   geom_line() +
   labs(title = paste0("Transfer Functions\n Block Length = ", N, " samples\n", "Sampled at ", length(freq), " Frequencies"), x = "Frequency", y = "")
 
-
 #facet plot of all three transfer functions
 # assuming A is dependant on all variables
 
@@ -50,4 +49,3 @@ ggplot(data = tf_all, aes(x = freq, y = val)) +
   facet_grid(tf~.) +
   geom_line() +
   labs(title = paste0("Transfer Functions\n Block Length = ", N, " samples"), x = "Frequency", y = "")
-
