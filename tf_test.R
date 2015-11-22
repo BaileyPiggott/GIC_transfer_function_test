@@ -46,6 +46,7 @@ ggplot(data = tf, aes(x = freq, y = val)) +
 tf_three <- data.frame('freq' = freq, 'H' = tf_all[1,], 'D' = tf_all[2,], 'Z' = tf_all[3,]) %>% 
   gather(tf, val, 2:4)
 
+
 ggplot(data = tf_three, aes(x = freq, y = val)) +
   facet_grid(tf~.) +
   geom_line() +
