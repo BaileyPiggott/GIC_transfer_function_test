@@ -9,6 +9,7 @@ library(MASS) # need for pseudoinverse
 library(ggplot2)
 
 source('get_spec.R') #function to generate spectral estimate
+source('get_spec_mtm.R') # generate spectral estimate using multitaper method
 source('get_tf.R') # function to generate transfer function
 source('get_tf_all.R')
 
@@ -19,14 +20,16 @@ colnames(sim_data) <- c('H', 'D', 'Z', 'A')
 
 N = 300 # number of data points per block
 
-spec_H_block <- get_spec(sim_data$H, N)
-spec_D_block <- get_spec(sim_data$D, N)
-spec_Z_block <- get_spec(sim_data$Z, N)
-spec_A_block <- get_spec(sim_data$A, N)
+spec_H_block <- get_spec_mtm(sim_data$H, N) 
+spec_D_block <- get_spec_mtm(sim_data$D, N)
+spec_Z_block <- get_spec_mtm(sim_data$Z, N)
+spec_A_block <- get_spec_mtm(sim_data$A, N)
+# get_spec_mtm joins a frequency vector to the front of the data frame
+
 
 # make transfer function ---------------------
 
-freq <- seq(1,(N/2+1),2) # frequencies at which to calculate the transfer function
+freq <- seq(1,nrow(spec_H_block),2) # frequencies at which to calculate the transfer function
 
 tf <- get_tf_ind(spec_H_block, spec_D_block, spec_Z_block, spec_A_block, freq)
 
