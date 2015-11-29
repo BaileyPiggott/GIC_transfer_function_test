@@ -1,4 +1,4 @@
-# test method of creating a transfer function using simulated data
+# method of creating a transfer function using simulated data
 
 #load data and functions and libraries------------
 library(tidyr)
@@ -16,32 +16,48 @@ source('get_tf_all.R')
 sim_data <- as.data.frame(read.table("sim_data.txt"))
 colnames(sim_data) <- c('H', 'D', 'Z', 'A')
 
+# plot simulated data --------------------------
+plot_sim <- sim_data %>% 
+  mutate(time = (1:nrow(sim_data))) %>% # add time column for plotting
+  gather(type, val, H:A) # convert to long form to plot in facets
+
+ggplot(data = plot_sim, aes(x = time, y = val)) +
+  facet_grid(type~.) +
+  geom_line() +
+  labs(title = "Simulated Data", x = "Time", y = "")
+
 # create spectral estimates --------------------
 
-N = 300 # number of data points per block
+block_N = 200 # number of data points per block
+nw <- 4
+k <- 7
 
-spec_H_block <- get_spec_mtm(sim_data$H, N) 
-spec_D_block <- get_spec_mtm(sim_data$D, N)
-spec_Z_block <- get_spec_mtm(sim_data$Z, N)
-spec_A_block <- get_spec_mtm(sim_data$A, N)
-# get_spec_mtm joins a frequency vector to the front of the data frame
-
+spec_H_block <- get_spec_mtm(sim_data$H, nw, k, block_N) 
+spec_D_block <- get_spec_mtm(sim_data$D, nw, k, block_N)
+spec_Z_block <- get_spec_mtm(sim_data$Z, nw, k, block_N)
+spec_A_block <- get_spec_mtm(sim_data$A, nw, k, block_N)
 
 # make transfer function ---------------------
 
 freq <- seq(1,nrow(spec_H_block),2) # frequencies at which to calculate the transfer function
 
-tf <- get_tf_ind(spec_H_block, spec_D_block, spec_Z_block, spec_A_block, freq)
+tf_H <- get_tf_ind(spec_H_block, spec_A_block, freq)
+tf_D <- get_tf_ind(spec_D_block, spec_A_block, freq)
+tf_Z <- get_tf_ind(spec_Z_block, spec_A_block, freq)
 
-tf_all <- get_tf_all(spec_H_block, spec_D_block, spec_Z_block, spec_A_block, freq)
+#tf_all <- get_tf_all(spec_H_block, spec_D_block, spec_Z_block, spec_A_block, freq)
 
-#plot transfer functions ----------------------------
+# plot transfer functions --------------
 
-#individual plots assuming A has dependence on only given variable
-ggplot(data = tf, aes(x = freq, y = val)) +
-  facet_grid(tf~.) +
+# independent transfer functions
+ggplot(data = tf_H, aes(x = freq, y = val)) +
+  facet_grid(type~., scale = "free_y") +
   geom_line() +
-  labs(title = paste0("Transfer Functions\n Block Length = ", N, " samples\n", "Sampled at ", length(freq), " Frequencies"), x = "Frequency", y = "")
+  stat_smooth(method = "loess", formula = y ~ x, size = 1, se = "FALSE", colour = "red") +
+  labs(title = paste0("Transfer Function\nNumber of Blocks = ", nrow(sim_data)/block_N), x = "Frequency", y = "")
+
+
+#-----------------------
 
 #facet plot of all three transfer functions
 # assuming A is dependant on all variables
