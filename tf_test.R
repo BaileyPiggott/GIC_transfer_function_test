@@ -28,10 +28,17 @@ ggplot(data = plot_sim, aes(x = time, y = val)) +
 
 # create spectral estimates --------------------
 
-block_N = 200 # number of data points per block
+block_N = 300 # number of data points per block
 nw <- 4
 k <- 7
 
+# not using multitaper method
+spec_H_block <- get_spec(sim_data$H, block_N)
+spec_D_block <- get_spec(sim_data$D, block_N)
+spec_Z_block <- get_spec(sim_data$Z, block_N)
+spec_A_block <- get_spec(sim_data$A, block_N)
+
+#using multitaper method
 spec_H_block <- get_spec_mtm(sim_data$H, nw, k, block_N) 
 spec_D_block <- get_spec_mtm(sim_data$D, nw, k, block_N)
 spec_Z_block <- get_spec_mtm(sim_data$Z, nw, k, block_N)
@@ -45,7 +52,7 @@ tf_H <- get_tf_ind(spec_H_block, spec_A_block, freq)
 tf_D <- get_tf_ind(spec_D_block, spec_A_block, freq)
 tf_Z <- get_tf_ind(spec_Z_block, spec_A_block, freq)
 
-#tf_all <- get_tf_all(spec_H_block, spec_D_block, spec_Z_block, spec_A_block, freq)
+tf_all <- get_tf_all(spec_H_block, spec_D_block, spec_Z_block, spec_A_block, freq)
 
 # plot transfer functions --------------
 
@@ -53,20 +60,14 @@ tf_Z <- get_tf_ind(spec_Z_block, spec_A_block, freq)
 ggplot(data = tf_H, aes(x = freq, y = val)) +
   facet_grid(type~., scale = "free_y") +
   geom_line() +
-  stat_smooth(method = "loess", formula = y ~ x, size = 1, se = "FALSE", colour = "red") +
+  stat_smooth(method = "loess", formula = y ~ x, size = 0.5, se = "FALSE", colour = "red") +
   labs(title = paste0("Transfer Function\nNumber of Blocks = ", nrow(sim_data)/block_N), x = "Frequency", y = "")
-
-
-#-----------------------
 
 #facet plot of all three transfer functions
 # assuming A is dependant on all variables
 
-tf_three <- data.frame('freq' = freq, 'H' = tf_all[1,], 'D' = tf_all[2,], 'Z' = tf_all[3,]) %>% 
-  gather(tf, val, 2:4)
-
-
-ggplot(data = tf_three, aes(x = freq, y = val)) +
-  facet_grid(tf~.) +
+ggplot(data = tf_all, aes(x = freq, y = val)) +
+  facet_grid(type~component, scale = "free_y") +
   geom_line() +
-  labs(title = paste0("Transfer Functions\n Block Length = ", N, " samples\n", "Sampled at ", length(freq), " Frequencies"), x = "Frequency", y = "")
+  stat_smooth(method = "loess", formula = y ~ x, size = 0., se = "FALSE", colour = "red") +
+  labs(title = paste0("Transfer Functions\nNumber of Blocks = ", nrow(sim_data)/block_N), x = "Frequency", y = "")

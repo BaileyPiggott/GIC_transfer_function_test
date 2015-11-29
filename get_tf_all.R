@@ -1,16 +1,13 @@
 # function to create transfer function dependent on all three variables
 
 get_tf_all <- function(spec_H, spec_D, spec_Z, spec_A, freq){
+
   # H, D, Z are three components of magnetic field; A is geomagnetically induced current
   # freq is vector of frequencies at which to calculate TF value
-  
-  TF_H=vector(mode = 'numeric', length = length(freq)) # initialize empty matrix to store tf
-  TF_D=vector(mode = 'numeric', length = length(freq)) # initialize empty matrix to store tf
-  TF_Z=vector(mode = 'numeric', length = length(freq)) # initialize empty matrix to store tf
+  tf <- matrix(ncol = 3 , nrow = length(freq)) # initialize empty matrix for transfer function
   
   # create vectors from geomag data; each column vector is value of all blocks at one frequency
-  # rows correspond to blocks, and columns correspond to one frequency
-  
+  # rows correspond to blocks, and columns correspond to one frequency  
   F_H <- matrix(ncol = length(freq), nrow = (ncol(spec_H))) # initialize empty matrix for sampling at given frequencies
   F_D <- matrix(ncol = length(freq), nrow = (ncol(spec_D))) # initialize empty matrix for sampling at given frequencies
   F_Z <- matrix(ncol = length(freq), nrow = (ncol(spec_Z))) # initialize empty matrix for sampling at given frequencies
@@ -25,19 +22,32 @@ get_tf_all <- function(spec_H, spec_D, spec_Z, spec_A, freq){
     F_A[,j] <- t(spec_A[freq[j],]) #take row corresponding to jth chosen frequency
     
   }
-  
-  M_test <- matrix(nrow = 3 , ncol = length(freq)) # initialize empty matrix for transfer function
-  
-  #calculate and plot transfer function for each component (M)
+ 
+  #calculate transfer function for each component
   
   for(i in 1:length(freq)){
     
     F_block <- as.matrix(data.frame(F_H[,i], F_D[,i], F_Z[,i]))
     
-    M_test[,i] <- ginv(F_block) %*% F_A[,i] # each column is the three component tf at given freq
+    tf[i,] <- ginv(F_block) %*% F_A[,i] # each column is the three component tf at given freq
 
   }
   
-  return(M_test)
+  # create data frames of tf magnitude and phase ----------------
+  p=1/2*nrow(tf)
+  mag <- abs(tf)
+  phase <- atan2(Im(tf), Re(tf))
+
+  tf_x <- data.frame(freq = seq(0,0.5,0.5/p), Magnitude = mag[1:(p+1),1], Phase = phase[1:(p+1),1]) %>%
+    mutate(component = 'H')
+  tf_y <- data.frame(freq = seq(0,0.5,0.5/p), Magnitude = mag[1:(p+1),2], Phase = phase[1:(p+1),2]) %>%
+    mutate(component = 'D')
+  tf_z <- data.frame(freq = seq(0,0.5,0.5/p), Magnitude = mag[1:(p+1),3], Phase = phase[1:(p+1),3]) %>%
+    mutate(component = 'Z')
+  
+  tf <- bind_rows(tf_x, tf_y, tf_z) %>% 
+    gather(type, val, Magnitude:Phase)
+  
+  return(tf)
 }
 
