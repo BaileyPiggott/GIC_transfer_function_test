@@ -14,7 +14,7 @@ get_spec <- function(data, block_length){
     block[,j]<- data[(1+(j-1)*N):(j*N)]
    
     #spectral estimate of each block:
-    spec_est[,j] <- (1/N)*abs(fft(block[,j]))^2
+    spec_est[,j] <- (1/N)*(fft(block[,j]))^2
   }
 
   spec_est <- spec_est[1:(N/2+1),] #spectra are symmetric; only need half
