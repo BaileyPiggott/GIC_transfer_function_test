@@ -34,7 +34,7 @@ ggplot(data = plot_sim, aes(x = time, y = val)) +
 
 # create spectral estimates --------------------
 
-block_N = 300 # number of data points per block
+block_N = 3000 # number of data points per block
 nw <- 4
 k <- 7
 
@@ -54,22 +54,9 @@ spec_A_block <- get_spec_mtm(sim_data$A, nw, k, block_N)
 
 freq <- seq(1,nrow(spec_H_block),2) # frequencies at which to calculate the transfer function
 
-tf_H <- get_tf_ind(spec_H_block, spec_A_block, freq)
-tf_D <- get_tf_ind(spec_D_block, spec_A_block, freq)
-tf_Z <- get_tf_ind(spec_Z_block, spec_A_block, freq)
-
 tf_all <- get_tf_all(spec_H_block, spec_D_block, spec_Z_block, spec_A_block, freq)
 
 # plot transfer functions --------------
-
-# independent transfer functions
-ggplot(data = tf_H, aes(x = freq, y = val)) +
-  facet_grid(type~., scale = "free_y") +
-  geom_line() +
-  stat_smooth(method = "loess", formula = y ~ x, size = 0.5, se = "FALSE", colour = "red") +
-  labs(title = paste0("Transfer Function\nNumber of Blocks = ", nrow(sim_data)/block_N), x = "Frequency", y = "") 
-#facet plot of all three transfer functions
-# assuming A is dependant on all variables
 
 ggplot(data = tf_all, aes(x = freq, y = val)) +
   facet_grid(type~component, scale = "free_y") +
