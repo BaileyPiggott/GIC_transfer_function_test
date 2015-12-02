@@ -24,7 +24,13 @@ plot_sim <- sim_data %>%
 ggplot(data = plot_sim, aes(x = time, y = val)) +
   facet_grid(type~.) +
   geom_line() +
-  labs(title = "Simulated Data", x = "Time", y = "")
+  coord_cartesian(xlim = c(0,3000)) +
+  labs(title = "Simulated Data", x = "Time", y = "")+
+  theme(
+    title = element_text(size = 13),
+    axis.text = element_text(size  =10),
+    strip.text = element_text(size = 13, face = 'bold')
+  )
 
 # create spectral estimates --------------------
 
@@ -61,8 +67,7 @@ ggplot(data = tf_H, aes(x = freq, y = val)) +
   facet_grid(type~., scale = "free_y") +
   geom_line() +
   stat_smooth(method = "loess", formula = y ~ x, size = 0.5, se = "FALSE", colour = "red") +
-  labs(title = paste0("Transfer Function\nNumber of Blocks = ", nrow(sim_data)/block_N), x = "Frequency", y = "")
-
+  labs(title = paste0("Transfer Function\nNumber of Blocks = ", nrow(sim_data)/block_N), x = "Frequency", y = "") 
 #facet plot of all three transfer functions
 # assuming A is dependant on all variables
 
@@ -70,4 +75,10 @@ ggplot(data = tf_all, aes(x = freq, y = val)) +
   facet_grid(type~component, scale = "free_y") +
   geom_line() +
   stat_smooth(method = "loess", formula = y ~ x, size = 0., se = "FALSE", colour = "red") +
-  labs(title = paste0("Transfer Functions\nNumber of Blocks = ", nrow(sim_data)/block_N), x = "Frequency", y = "")
+  labs(title = paste0("Transfer Functions\nNumber of Blocks = ", nrow(sim_data)/block_N), x = "Frequency", y = "")+
+  theme(
+    title = element_text(size = 13),
+    axis.text = element_text(size  =10),
+    strip.text = element_text(size = 13, face = 'bold')
+  )
+
