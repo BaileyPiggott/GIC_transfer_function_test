@@ -34,19 +34,7 @@ get_tf_all <- function(spec_H, spec_D, spec_Z, spec_A, freq){
   }
   
   # create data frames of tf magnitude and phase ----------------
-  p=1/2*nrow(tf)
-  mag <- abs(tf)
-  phase <- atan2(Im(tf), Re(tf))
 
-  tf_x <- data.frame(freq = seq(0,0.5,0.5/p), Magnitude = mag[1:(p+1),1], Phase = phase[1:(p+1),1]) %>%
-    mutate(component = 'H')
-  tf_y <- data.frame(freq = seq(0,0.5,0.5/p), Magnitude = mag[1:(p+1),2], Phase = phase[1:(p+1),2]) %>%
-    mutate(component = 'D')
-  tf_z <- data.frame(freq = seq(0,0.5,0.5/p), Magnitude = mag[1:(p+1),3], Phase = phase[1:(p+1),3]) %>%
-    mutate(component = 'Z')
-  
-  tf <- bind_rows(tf_x, tf_y, tf_z) %>% 
-    gather(type, val, Magnitude:Phase)
   
   return(tf)
 }
