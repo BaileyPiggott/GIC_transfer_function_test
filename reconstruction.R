@@ -3,10 +3,11 @@
 #Functions -------------------
 # Finds local maxes in the Ftest given a spec.mtm object.
 # based on a probability cutoff
+# Returns the indices.
 
-#sketchy version of find local Fmax function
+#version of find local Fmax function for predictions
 
-test_function <- function(ftest, k, cutoff){
+prediction_fmax <- function(ftest, k, cutoff){
   
   Fval <- ftest
   
@@ -31,9 +32,7 @@ test_function <- function(ftest, k, cutoff){
   maxes
 }
 
-
-
-# Returns the indices.
+#dave's function:
 findLocalFMax <- function(obj, cutoff){
   # Check whether this is a spec.mtm() object, or from my own CMV code.
   if (any(class(obj) == "Ftest")){
@@ -72,21 +71,30 @@ source('get_tf_all.R')
 library(MASS) # need for pseudoinverse
 
 sim_data <- as.data.frame(read.table("MA6.txt"))
-h <- sim_data$V2
-d <- sim_data$V3
-z <- sim_data$V4
-a <- sim_data$V5 #current 
+train_data <- sim_data[1:(nrow(sim_data)/2), ]
+test_data <- sim_data[(nrow(sim_data)/2 +1):nrow(sim_data), ]
 
-x <- 1:length(a)
-fit <- lm(a ~ x + I(x^2) + I(x^3))
+h_train <- train_data$V2
+d_train <- train_data$V3
+z_train <- train_data$V4
+a_train <- train_data$V5 #current 
+
+h_test <- test_data$V2
+d_test <- test_data$V3
+z_test <- test_data$V4
+a_test <- test_data$V5 #current 
+
+
+x <- 1:length(a_train)
+fit <- lm(a_train ~ x + I(x^2) + I(x^3))
 cubeTrend <- fitted.values(fit)
-a2 <- a - cubeTrend # removing a cubic trend (want this for the reconstruction part)
+a2 <- a_train - cubeTrend # removing a cubic trend (want this for the reconstruction part)
 
 #plot check----------------
 ## top: plot with cubic fit overlay
 ## bottom: residuals after removing cubic fit.
 par(mfrow=c(2,1), mar=c(4,4,1,1), mgp=c(2.5,1,0))
-plot(a, type='l', main = "Original Data with Cubic Trend")
+plot(a_train, type='l', main = "Original Data with Cubic Trend")
 lines(cubeTrend, col='red', lwd=2)
 plot(a2, type='l', ylab="Residuals", main = "Residuals") # want 0-mean for reconstruction
 
@@ -94,9 +102,6 @@ plot(a2, type='l', ylab="Residuals", main = "Residuals") # want 0-mean for recon
 require('multitaper')
 
 # calculate the spectrum (returnInternals gives us the complex-mean-values (cmv's))
-
-# cmv's are an average of the eigencoefficients (windowed-fourier-transformed data)
-# if you average the squared eigencoefficients, you get the spectrum.
 
 s <- spec.mtm(a2, Ftest=TRUE, returnInternals=TRUE, plot=FALSE)
 
@@ -106,69 +111,53 @@ freqIdx <- findLocalFMax(s, 0.9)# find frequencies of large F-values ("most sinu
 cmv <- rep(0, s$mtm$nFFT)
 cmv[freqIdx] <- s$mtm$cmv[freqIdx]
 cmv[s$mtm$nFFT-freqIdx+2] <- Conj(s$mtm$cmv[freqIdx])
-
 # the "negative" side of the cmv's actually go in the right side of the array and must be
 # conjugated (due to the minus sign on the frequency)
 
 #create transfer function for prediction -----------
 
-sh <- spec.mtm(h, Ftest=TRUE, returnInternals=TRUE, plot=FALSE)
-sd <- spec.mtm(d, Ftest=TRUE, returnInternals=TRUE, plot=FALSE)
-sz <- spec.mtm(z, Ftest=TRUE, returnInternals=TRUE, plot=FALSE)
+sh_train <- spec.mtm(h_train, Ftest=TRUE, returnInternals=TRUE, plot=FALSE)
+sd_train <- spec.mtm(d_train, Ftest=TRUE, returnInternals=TRUE, plot=FALSE)
+sz_train <- spec.mtm(z_train, Ftest=TRUE, returnInternals=TRUE, plot=FALSE)
 
-freq <- seq(1,nrow(sh$mtm$eigenCoefs),1) # frequencies at which to calculate the transfer function
+freq <- seq(1,nrow(sh_train$mtm$eigenCoefs),1) # frequencies at which to calculate the transfer function
 
-tf <- get_tf_all(sh$mtm$eigenCoefs, sd$mtm$eigenCoefs, sz$mtm$eigenCoefs, s$mtm$eigenCoefs, freq)
+tf <- get_tf_all(sh_train$mtm$eigenCoefs, sd_train$mtm$eigenCoefs, sz_train$mtm$eigenCoefs, s$mtm$eigenCoefs, freq)
 
 #predict current ------------------
+#spectral estimates of test data
+sh_test <- spec.mtm(h_test, Ftest=TRUE, returnInternals=TRUE, plot=FALSE)
+sd_test <- spec.mtm(d_test, Ftest=TRUE, returnInternals=TRUE, plot=FALSE)
+sz_test <- spec.mtm(z_test, Ftest=TRUE, returnInternals=TRUE, plot=FALSE)
 
-F_test_H <- matrix(ncol = length(freq), nrow = 7) # initialize empty matrix for sampling at given frequencies
-F_test_D <- matrix(ncol = length(freq), nrow = 7) # initialize empty matrix for sampling at given frequencies
-F_test_Z <- matrix(ncol = length(freq), nrow = 7) # initialize empty matrix for sampling at given frequencies
+
+F_H <- matrix(ncol = length(freq), nrow = 7) # initialize empty matrix for sampling at given frequencies
+F_D <- matrix(ncol = length(freq), nrow = 7) # initialize empty matrix for sampling at given frequencies
+F_Z <- matrix(ncol = length(freq), nrow = 7) # initialize empty matrix for sampling at given frequencies
 
 
 for(j in 1:length(freq)){  
-  F_test_H[,j] <- t(sh$mtm$eigenCoefs[freq[j],]) #take row corresponding to jth chosen frequency
-  F_test_D[,j] <- t(sd$mtm$eigenCoefs[freq[j],]) #take row corresponding to jth chosen frequency
-  F_test_Z[,j] <- t(sz$mtm$eigenCoefs[freq[j],]) #take row corresponding to jth chosen frequency
+  F_H[,j] <- t(sh_test$mtm$eigenCoefs[freq[j],]) #take row corresponding to jth chosen frequency
+  F_D[,j] <- t(sd_test$mtm$eigenCoefs[freq[j],]) #take row corresponding to jth chosen frequency
+  F_Z[,j] <- t(sz_test$mtm$eigenCoefs[freq[j],]) #take row corresponding to jth chosen frequency
 }
 
-F_predict_A <- matrix(ncol = length(freq), nrow = 7) # initialize empty matrix for sampling at given frequencies
+pred_F_A <- matrix(ncol = length(freq), nrow = 7) # initialize empty matrix for sampling at given frequencies
 
 for(i in 1:length(freq)){
-  F_block <- as.matrix(data.frame(F_test_H[,i], F_test_D[,i], F_test_Z[,i]))  
-  F_predict_A[,i] <- F_block %*% tf[i,]
+  F_block <- as.matrix(data.frame(F_H[,i], F_D[,i], F_Z[,i]))  
+  pred_F_A[,i] <- F_block %*% tf[i,]
 }
 
-prediction <- matrix(ncol = 7, nrow = nrow(sh$mtm$eigenCoefs))
+prediction <- matrix(ncol = 7, nrow = nrow(sh_test$mtm$eigenCoefs))
 
 for(j in 1:length(freq)){
-  prediction[freq[j],] <- t(F_predict_A[,j])
+  prediction[freq[j],] <- t(pred_F_A[,j])
 }
 
-#reconstruction of actual data ---------------
-
-recon <- Re(fft(cmv, inverse=TRUE)[1:length(a2)])
-# the fourier transform is complex, however since we started with real data, 
-# the imaginary part will be zero, so just take the real part.
-
-fullRecon <- recon + cubeTrend
-
-par(mfrow=c(2,1))
-plot(a2, type='l', col='grey', lwd=2, main="Reconstruction of Zero Mean Data")
-lines(recon, col='blue')
-plot(a, type='l', col='grey', lwd=2, main="Reconstruction of Original Data")
-lines(fullRecon, col='blue')
-
 #cmv's of prediction -----------
-
-#assume F-test from training data applies to prediction
-ftest <- s$mtm$Ftest
-k=7
-freqIndex_pred <- test_function(ftest, k, 0.9)
-
 #complex mean values:
-slep <- dpss(n = length(a), k = k, nw = 4, returnEigenvalues = FALSE)$v #slepian tapers
+slep <- dpss(n = length(a_test), k = k, nw = 4, returnEigenvalues = FALSE)$v #slepian tapers
 
 U_kzero <- mvfft(slep)[1, ] # You only want the zeroeth frequency
 
@@ -177,21 +166,56 @@ if (k >= 2){
 }
 ssqU_kzero <- sum(U_kzero^2)
 
-pred_cmv <- (prediction %*% U_kzero) / ssqU_kzero
+all_pred_cmv <- (prediction %*% U_kzero) / ssqU_kzero
+
+#F test on prediction ----------
+k=7
+pred_ftest <- rep(0, nrow(prediction)) #initialize vector of f test results
+
+for(i in 1:nrow(prediction)){
+  # formula from Thomson, 1982 (equation 13.10)
+  denom = 0;
+
+  for(j in 1:k){
+    denom <- denom + abs(prediction[i,j] - all_pred_cmv[i]*U_kzero[j])^2
+  }
+  
+  pred_ftest[i] <- Re(((k-1)*ssqU_kzero*abs(all_pred_cmv[i])^2)/denom)
+    
+}
+
+pred_freqIndex <- prediction_fmax(pred_ftest, k, 0.9)
 
 #reconstruct prediction----------
 
-test_cmv <- rep(0, nrow(prediction))
-test_cmv[freqIndex_pred] <- pred_cmv[freqIndex_pred] #only take frequencies from f test
-test_cmv[length(pred_cmv)-freqIndex_pred+2] <- Conj(pred_cmv[freqIndex_pred])
+pred_cmv <- rep(0, nrow(prediction))
+pred_cmv[pred_freqIndex] <- all_pred_cmv[pred_freqIndex] #only take frequencies from f test
+pred_cmv[length(all_pred_cmv)-pred_freqIndex+2] <- Conj(all_pred_cmv[pred_freqIndex])
 
-test_recon <- Re(fft(test_cmv, inverse=TRUE)[1:length(a)])
+#for(i in 1:length(pred_cmv)){
+#  pred_cmv[length(pred_cmv)-i] <- Conj(all_pred_cmv[i])  
+#}
+
+pred_recon <- Re(fft(pred_cmv, inverse=TRUE)[1:length(a_test)])
+
+#reconstruction of actual data ---------------
+# the fourier transform is complex, however since we started with real data, 
+# the imaginary part will be zero, so just take the real part.
+recon <- Re(fft(cmv, inverse=TRUE)[1:length(a2)])
+fullRecon <- recon + cubeTrend
+
+#plot with original data
+par(mfrow=c(2,1))
+plot(a2, type='l', col='grey', lwd=2, main="Reconstruction of Zero Mean Data")
+lines(recon, col='blue')
+plot(a_train, type='l', col='grey', lwd=2, main="Reconstruction of Original Data")
+lines(fullRecon, col='blue')
 
 #plot prediction------------
 
 par(mfrow=c(2,1))
-plot(a, type='l', col='grey', lwd=2, main="Reconstruction of Prediction")
-lines(test_recon, col='blue')
-plot(a, type='l', col='grey', lwd=2, main="add cubic trend")
-lines(recon + cubeTrend, col='blue')
+plot(a_train, type='l', col='grey', lwd=2, main="Reconstruction of Training Data")
+lines(fullRecon, col='blue')
+plot(a_test, type='l', col='grey', lwd=2, main="Reconstruction of Prediction on Testing Data")
+lines(pred_recon+cubeTrend, col='red')
 
