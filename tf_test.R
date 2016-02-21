@@ -21,13 +21,10 @@ sim_data <- sim_data[,-1] #MA4 and MA6 have an extra column
 colnames(sim_data) <- c('H', 'D', 'Z', 'A')
 
 ##70% of the data for training; 30% for testing
-#training_size <- ceiling(0.7 * nrow(sim_data))
-#test_size <- nrow(sim_data)-training_size
+training_size <- ceiling(0.7 * nrow(sim_data))
 
-#train_data <- sim_data[1:training_size,]
-#test_data <- sim_data[(training_size+1):nrow(sim_data),]
-train_data <- sim_data[1:1316,]
-test_data <- sim_data[1317:2632,]
+train_data <- sim_data[1:training_size,]
+test_data <- sim_data[(training_size+1):(nrow(sim_data)-1),]
 
 ## plot simulated data --------------------------
 # plot_sim <- sim_data %>% 
@@ -46,7 +43,8 @@ test_data <- sim_data[1317:2632,]
 #   )
 
 # create spectral estimates --------------------
-block_N = 188 # number of data points per block
+block_N = 394 # number of data points per block; 
+# *****N MUST be a factor of number of samples in test data***
 nw <- 4
 k <- 7
 
@@ -67,32 +65,32 @@ freq <- seq(1,nrow(spec_H_block),1) # frequencies at which to calculate the tran
 
 tf <- get_tf_all(spec_H_block, spec_D_block, spec_Z_block, spec_A_block, freq)
 
-# plot transfer function --------------
-# convert transfer function to matrix for graphing
-p=1/2*nrow(tf)
-mag <- abs(tf)
-phase <- atan2(Im(tf), Re(tf))
-
-tf_x <- data.frame(freq = seq(0,0.5,0.5/p), Magnitude = mag[1:(p+1),1], Phase = phase[1:(p+1),1]) %>%
-  mutate(component = 'H')
-tf_y <- data.frame(freq = seq(0,0.5,0.5/p), Magnitude = mag[1:(p+1),2], Phase = phase[1:(p+1),2]) %>%
-  mutate(component = 'D')
-tf_z <- data.frame(freq = seq(0,0.5,0.5/p), Magnitude = mag[1:(p+1),3], Phase = phase[1:(p+1),3]) %>%
-  mutate(component = 'Z')
-
-tf_plot <- bind_rows(tf_x, tf_y, tf_z) %>% 
-  gather(type, val, Magnitude:Phase)
-
-ggplot(data = tf_plot, aes(x = freq, y = val)) +
-  facet_grid(type~component, scale = "free_y") +
-  geom_line() +
-  stat_smooth(method = "loess", formula = y ~ x, size = 0., se = "FALSE", colour = "red") +
-  labs(title = paste0("Transfer Functions\nNumber of Blocks = ", (nrow(sim_data)-1)/(2*block_N)), x = "Frequency", y = "")+
-  theme(
-    title = element_text(size = 13),
-    axis.text = element_text(size  =10),
-    strip.text = element_text(size = 13, face = 'bold')
-  )
+## plot transfer function --------------
+# # convert transfer function to matrix for graphing
+# p=1/2*nrow(tf)
+# mag <- abs(tf)
+# phase <- atan2(Im(tf), Re(tf))
+# 
+# tf_x <- data.frame(freq = seq(0,0.5,0.5/p), Magnitude = mag[1:(p+1),1], Phase = phase[1:(p+1),1]) %>%
+#   mutate(component = 'H')
+# tf_y <- data.frame(freq = seq(0,0.5,0.5/p), Magnitude = mag[1:(p+1),2], Phase = phase[1:(p+1),2]) %>%
+#   mutate(component = 'D')
+# tf_z <- data.frame(freq = seq(0,0.5,0.5/p), Magnitude = mag[1:(p+1),3], Phase = phase[1:(p+1),3]) %>%
+#   mutate(component = 'Z')
+# 
+# tf_plot <- bind_rows(tf_x, tf_y, tf_z) %>% 
+#   gather(type, val, Magnitude:Phase)
+# 
+# ggplot(data = tf_plot, aes(x = freq, y = val)) +
+#   facet_grid(type~component, scale = "free_y") +
+#   geom_line() +
+#   stat_smooth(method = "loess", formula = y ~ x, size = 0., se = "FALSE", colour = "red") +
+#   labs(title = paste0("Transfer Functions\nNumber of Blocks = ", (nrow(sim_data)-1)/(2*block_N)), x = "Frequency", y = "")+
+#   theme(
+#     title = element_text(size = 13),
+#     axis.text = element_text(size  =10),
+#     strip.text = element_text(size = 13, face = 'bold')
+#   )
 
 #prediction ----------------------------
 
@@ -127,27 +125,32 @@ for(j in 1:length(freq)){
   spec_pred_A[freq[j],] <- t(F_predict_A[,j])
 }
 
-#format data for plotting --------------------
+#reconstruct prediction and format for plotting --------------------
 
-pred_block1 <-reconstruct(spec_pred_A[,1:k], block_N, k, nw)
-pred_block2 <-reconstruct(spec_pred_A[,(k+1):(2*k)], block_N, k, nw)
+prediction<- data.frame(0) # initialize prediction
 
-prediction <- bind_rows(pred_block1, pred_block2)
+for(i in 1:(nrow(test_data)/block_N)){
+  
+  pred_recon <- reconstruct(spec_pred_A[,((i-1)*k+1):(i*k)], block_N, k, nw)
+  
+  prediction<- bind_rows(prediction, pred_recon)
+}
+prediction <- prediction[-1, 2] #take out 0 row 
 
-measured <- data.frame(test_data$A[1:(2*block_N)])
+measured <- data.frame(test_data$A)
 time <- c(1:length(prediction))
 
-test <- bind_cols(measured, prediction)
-colnames(test) <- c('measured', 'predicted')
-test$index <- as.numeric(rownames(test))
+time_data <- bind_cols(measured, prediction)
+colnames(time_data) <- c('measured', 'predicted')
+time_data$index <- as.numeric(rownames(time_data))
 
-test <- test %>% gather("type", "a", measured:predicted)
+time_data <- time_data %>% gather("type", "a", measured:predicted)
 
 #plot ---------------
 
-ggplot(data = test,aes(x= index, y = a, colour = type, size = type)) +
+ggplot(data = time_data,aes(x= index, y = a, colour = type, size = type)) +
   geom_line()+
-  #coord_cartesian(xlim = c(0.5,4.5), ylim = c(0, 4)) + 
+  coord_cartesian( ylim = c(-5, 5)) + 
   theme(
     axis.line = element_line("grey"), 
     panel.grid.major.y = element_line("grey"),
@@ -156,7 +159,7 @@ ggplot(data = test,aes(x= index, y = a, colour = type, size = type)) +
     axis.ticks.x = element_blank(), # remove x axis ticks
     plot.title = element_text(size = 15),
     legend.key = element_blank(),
-    axis.title.x = element_blank(), # remove x axis title
+    axis.title.x = element_text(size = 14),
     axis.title.y = element_text(size = 14),
     axis.text = element_text(size = 12) #size of x axis labels
   ) +
@@ -166,7 +169,6 @@ ggplot(data = test,aes(x= index, y = a, colour = type, size = type)) +
     name = "" ) +
   scale_size_manual(
     values = c(1.2,0.7), 
-    name = ""
-    )
+    name = "")
   
   
