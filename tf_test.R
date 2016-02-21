@@ -1,72 +1,6 @@
 # method of creating a transfer function using simulated data
 # 3 dimensional magnetic field example
 
-#Functions -------------------
-# Finds local maxes in the Ftest given a spec.mtm object.
-# based on a probability cutoff
-# Returns the indices.
-
-#version of find local Fmax function for predictions
-
-prediction_fmax <- function(ftest, k, cutoff){
-  
-  Fval <- ftest
-  
-  fMaxInd <- which(Fval > qf(cutoff, 2, 2*k))
-  maxes <- c()
-  
-  if (length(fMaxInd) == 0){
-    return(maxes)
-  }
-  
-  for (i in 1:length(fMaxInd)){
-    if (fMaxInd[i] == 1 || fMaxInd[i] == length(Fval)){
-      next
-    }
-    
-    if (Fval[fMaxInd[i]] > Fval[fMaxInd[i]-1] && 
-          Fval[fMaxInd[i]] > Fval[fMaxInd[i]+1]){
-      maxes <- c(maxes, fMaxInd[i])
-    }
-  }
-  
-  maxes
-}
-
-#dave's function:
-findLocalFMax <- function(obj, cutoff){
-  # Check whether this is a spec.mtm() object, or from my own CMV code.
-  if (any(class(obj) == "Ftest")){
-    Fval <- obj$mtm$Ftest
-    k <- obj$mtm$k
-  } else if (any(class(obj) == "driegert.cmv")){
-    Fval <- obj$Ftest$Fval
-    k <- obj$k
-  } else {
-    stop("obj needs to be of class 'driegert.cmv' or 'Ftest'.")
-  }
-  
-  fMaxInd <- which(Fval > qf(cutoff, 2, 2*k))
-  maxes <- c()
-  
-  if (length(fMaxInd) == 0){
-    return(maxes)
-  }
-  
-  for (i in 1:length(fMaxInd)){
-    if (fMaxInd[i] == 1 || fMaxInd[i] == length(Fval)){
-      next
-    }
-    
-    if (Fval[fMaxInd[i]] > Fval[fMaxInd[i]-1] && 
-          Fval[fMaxInd[i]] > Fval[fMaxInd[i]+1]){
-      maxes <- c(maxes, fMaxInd[i])
-    }
-  }
-  
-  maxes
-}
-
 #load data and functions and libraries------------
 library(tidyr)
 library(magrittr)
@@ -79,6 +13,7 @@ source('get_spec.R') #function to generate spectral estimate
 source('get_spec_mtm.R') # generate spectral estimate using multitaper method
 source('get_tf.R') # function to generate transfer function
 source('get_tf_all.R')
+source('recon_function.R')
 
 #get data and separate into training and testing -----------------
 sim_data <- as.data.frame(read.table("MA6.txt"))
@@ -192,51 +127,46 @@ for(j in 1:length(freq)){
   spec_pred_A[freq[j],] <- t(F_predict_A[,j])
 }
 
-#convert prediction to time domain -----------
+#format data for plotting --------------------
 
-#complex mean values:
-slep <- dpss(n = block_N, k = k, nw = nw, returnEigenvalues = FALSE)$v #slepian tapers
+pred_block1 <-reconstruct(spec_pred_A[,1:k], block_N, k, nw)
+pred_block2 <-reconstruct(spec_pred_A[,(k+1):(2*k)], block_N, k, nw)
 
-U_kzero <- mvfft(slep)[1, ] # You only want the zeroeth frequency
+prediction <- bind_rows(pred_block1, pred_block2)
 
-if (k >= 2){
-  U_kzero[seq(2,k,2)] <- 0  # only want the even tapers... see P&W
-}
-ssqU_kzero <- sum(U_kzero^2)
+measured <- data.frame(test_data$A[1:(2*block_N)])
+time <- c(1:length(prediction))
 
-#separate blocks and reconstruct them individually **********************
-test <- spec_pred_A
-spec_pred_A <- spec_pred_A[,1:k]
+test <- bind_cols(measured, prediction)
+colnames(test) <- c('measured', 'predicted')
+test$index <- as.numeric(rownames(test))
 
-all_pred_cmv <- (spec_pred_A %*% U_kzero) / ssqU_kzero
-
-#F test on prediction 
-
-pred_ftest <- rep(0, nrow(spec_pred_A)) #initialize vector of f test results
-
-for(i in 1:nrow(spec_pred_A)){
-  # formula from Thomson, 1982 (equation 13.10)
-  denom = 0;
-  
-  for(j in 1:k){
-    denom <- denom + abs(spec_pred_A[i,j] - all_pred_cmv[i]*U_kzero[j])^2
-  }
-  pred_ftest[i] <- Re(((k-1)*ssqU_kzero*abs(all_pred_cmv[i])^2)/denom)
-}
-
-pred_freqIndex <- prediction_fmax(pred_ftest, k, 0.9)
-
-#reconstruct prediction----------
-
-pred_cmv <- rep(0, nrow(spec_pred_A))
-pred_cmv[pred_freqIndex] <- all_pred_cmv[pred_freqIndex] #only take frequencies from f test
-pred_cmv[length(all_pred_cmv)-pred_freqIndex+2] <- Conj(all_pred_cmv[pred_freqIndex])
-
-pred_recon <- Re(fft(pred_cmv, inverse=TRUE)[1:block_N])
+test <- test %>% gather("type", "a", measured:predicted)
 
 #plot ---------------
 
-plot(test_data$A[1:block_N], type='l', col = "grey", lwd=2,  main= "Prediction vs. Measured Data")
-lines(pred_recon, col='red')
-
-
+ggplot(data = test,aes(x= index, y = a, colour = type, size = type)) +
+  geom_line()+
+  #coord_cartesian(xlim = c(0.5,4.5), ylim = c(0, 4)) + 
+  theme(
+    axis.line = element_line("grey"), 
+    panel.grid.major.y = element_line("grey"),
+    panel.grid.major.x = element_blank(), # remove vertical white lines
+    panel.background = element_rect("white"),
+    axis.ticks.x = element_blank(), # remove x axis ticks
+    plot.title = element_text(size = 15),
+    legend.key = element_blank(),
+    axis.title.x = element_blank(), # remove x axis title
+    axis.title.y = element_text(size = 14),
+    axis.text = element_text(size = 12) #size of x axis labels
+  ) +
+  labs(title = "Measured Current vs. Predicted", x = "Time", y = "Induced Current") +
+  scale_colour_manual(
+    values = c("grey", "red"), 
+    name = "" ) +
+  scale_size_manual(
+    values = c(1.2,0.7), 
+    name = ""
+    )
+  
+  
