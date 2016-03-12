@@ -17,6 +17,17 @@ source('get_tf.R') # function to generate transfer function
 source('get_tf_all.R')
 source('recon_function.R')
 
+# parameters to adjust ----------
+block_N = 500 # number of data points per block; 
+# *****N MUST be a factor of number of samples in test data***
+
+current_threshold <- 1 #for "bad day" data
+test_data_low <- 3001
+test_data_high <- 3500 #interval of testing data
+
+nw <- 4
+k <- 7
+
 ##get data and separate into training and testing -----------------
 #data <- as.data.frame(read.table("MA6.txt"))
 #data <- data[,-1] #MA4 and MA6 have an extra column
@@ -49,21 +60,27 @@ inducedCurrent <- readRDS("inducedCurrent-1999-2012-15min.rds")
 data <- inner_join(geomag, inducedCurrent, by = "date") %>% select(X,Y,Z,value)
 colnames(data) <- c("H", "D", "Z", "A")
 
+bad_day <- as.data.frame(matrix(nrow = length(data), ncol = 4))
 
-maxInd <- which(abs(data$A) > 1)
-bad_day <- as.data.frame(matrix(nrow = length(maxInd), ncol = 4))
-
-
-for(i in 1:length(maxInd)){
+j=1;
+for (i in 1:nrow(data)){
   
-  bad_day[i, ] <- data[maxInd[i], ]
-  
+  if(data$A[i] > current_threshold){
+    bad_day[j, ] = data[i-1, ]
+    j=j+1
+    bad_day[j,] = data[i, ]
+    j=j+1
+    bad_day[j,] = data[i+1, ]
+    j=j+1
+  }
 }
 
 colnames(bad_day) <- colnames(data)
 train_data <- bad_day
 
-test_data <- data[2001:3000, ]
+#train_data <-data[4000:14068, ]
+
+test_data <- data[test_data_low:test_data_high, ]
 
 ## plot data --------------------------
 # plot_sim <- data %>% 
@@ -82,10 +99,6 @@ test_data <- data[2001:3000, ]
 #   )
 
 # create spectral estimates --------------------
-block_N = 500 # number of data points per block; 
-# *****N MUST be a factor of number of samples in test data***
-nw <- 4
-k <- 7
 
 # not using multitaper method
 #spec_H_block <- get_spec(train_data$H, block_N)
@@ -180,11 +193,13 @@ measured <- data.frame(test_data$A)
 
 time_data <- bind_cols(measured, prediction)
 colnames(time_data) <- c('measured', 'predicted')
-time_data$index <- as.numeric(rownames(time_data))
+time_data$index <- as.numeric(rownames(time_data))*15 #data is in 15 minute intervals
 
 time_data <- time_data %>% gather("type", "a", measured:predicted)
 
 #plot ---------------
+
+plot_title = paste0("Measured Current vs. Predicted\nCurrent Threshold =  ", current_threshold, " A")
 
 ggplot(data = time_data,aes(x= index, y = a, colour = type, size = type)) +
   geom_line()+
@@ -195,13 +210,14 @@ ggplot(data = time_data,aes(x= index, y = a, colour = type, size = type)) +
     panel.grid.major.x = element_blank(), # remove vertical white lines
     panel.background = element_rect("white"),
     axis.ticks.x = element_blank(), # remove x axis ticks
-    plot.title = element_text(size = 15),
+    plot.title = element_text(size = 16),
     legend.key = element_blank(),
+    legend.text = element_text(size = 12),
     axis.title.x = element_text(size = 14),
     axis.title.y = element_text(size = 14),
     axis.text = element_text(size = 12) #size of x axis labels
   ) +
-  labs(title = "Measured Current vs. Predicted", x = "Time (15 min interval)", y = "Induced Current (A)") +
+  labs(title = plot_title, x = "Time (min)", y = "Induced Current (A)") +
   scale_colour_manual(
     values = c("grey", "red"), 
     name = "" ) +
