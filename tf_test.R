@@ -1,5 +1,3 @@
-# method of creating a transfer function using simulated data
-# 3 dimensional magnetic field example
 
 #load functions and libraries------------
 library(tidyr)
@@ -28,31 +26,7 @@ test_data_high <- 3500 #interval of testing data
 nw <- 4
 k <- 7
 
-##get data and separate into training and testing -----------------
-#data <- as.data.frame(read.table("MA6.txt"))
-#data <- data[,-1] #MA4 and MA6 have an extra column
-#colnames(data) <- c('H', 'D', 'Z', 'A')
-
-
-# geomag <- readRDS("boulder_1999-2012_15min_final.rds")
-# inducedCurrent <- readRDS("inducedCurrent-1999-2012-15min.rds")
-# 
-# data <- inner_join(geomag, inducedCurrent, by = "date") %>% select(X,Y,Z,value)
-# colnames(data) <- c("H", "D", "Z", "A")
-# 
-# 
-# ##70% of the data for training; 30% for testing
-# training_size <- ceiling(0.7 * nrow(data))
-# 
-# train_data <- data[1:training_size,]
-# test_data <- data[(training_size+1):(nrow(data)),]
-
-
-#fit <- lm(train_data ~ x + I(x^2) + I(x^3))
-#cubeTrend <- fitted.values(fit)
-#a2 <- train_data - cubeTrend
-
-# test bad day data -------------
+#get data and separate into training and testing -----------------
 
 geomag <- readRDS("boulder_1999-2012_15min_final.rds")
 inducedCurrent <- readRDS("inducedCurrent-1999-2012-15min.rds")
@@ -60,7 +34,7 @@ inducedCurrent <- readRDS("inducedCurrent-1999-2012-15min.rds")
 data <- inner_join(geomag, inducedCurrent, by = "date") %>% select(X,Y,Z,value)
 colnames(data) <- c("H", "D", "Z", "A")
 
-bad_day <- as.data.frame(matrix(nrow = length(data), ncol = 4))
+bad_day <- as.data.frame(matrix(nrow = length(data), ncol = 4)) #initalize "bad day data"
 
 j=1;
 for (i in 1:nrow(data)){
@@ -74,27 +48,29 @@ for (i in 1:nrow(data)){
     j=j+1
   }
 }
-
 colnames(bad_day) <- colnames(data)
-train_data <- bad_day
 
-#train_data <-data[4000:14068, ]
+#choose training data:
+train_data <- bad_day #uncomment to use bad day data as training data
+#train_data <-data[4000:14068, ] #uncomment to use random data block as training data
 
-test_data <- data[test_data_low:test_data_high, ]
+test_data <- data[test_data_low:test_data_high, ] #testing data frame based on chosen thresholds
 
-## plot data --------------------------
-# plot_sim <- data %>% 
-#   mutate(time = (1:nrow(data))) %>% # add time column for plotting
+# # plot time domain data --------------------------
+# plot_sim <- data[11150:11520, ] %>% 
+#   mutate(time = (11150:11520)) %>% # add time column for plotting
 #   gather(type, val, H:A) # convert to long form to plot in facets
+# 
+# plot_sim$time <- plot_sim$time*15/60/24
 # 
 # ggplot(data = plot_sim, aes(x = time, y = val)) +
 #   facet_grid(type~., scales = "free_y") +
 #   geom_line() +
-#   coord_cartesian(xlim = c(0,3000)) +
-#   labs(title = "Simulated Data", x = "Time", y = "")+
+#   labs(title = "Subset of Provided Data", x = "Time (Days)", y = "")+
 #   theme(
-#     title = element_text(size = 13),
-#     axis.text = element_text(size  =10),
+#     plot.title = element_text(size = 16, face = "bold"),
+#     axis.title = element_text(size = 14),
+#     axis.text = element_text(size = 12), #size of x axis labels
 #     strip.text = element_text(size = 13, face = 'bold')
 #   )
 
@@ -193,36 +169,67 @@ measured <- data.frame(test_data$A)
 
 time_data <- bind_cols(measured, prediction)
 colnames(time_data) <- c('measured', 'predicted')
-time_data$index <- as.numeric(rownames(time_data))*15 #data is in 15 minute intervals
+time_data$index <- as.numeric(rownames(time_data))*15/60/24 #data is in 15 minute intervals
 
 time_data <- time_data %>% gather("type", "a", measured:predicted)
+time_data <- as.data.frame(time_data)
 
 #plot ---------------
 
-plot_title = paste0("Measured Current vs. Predicted\nCurrent Threshold =  ", current_threshold, " A")
+plot_title = paste0("Measured Current vs. Predicted")
 
 ggplot(data = time_data,aes(x= index, y = a, colour = type, size = type)) +
   geom_line()+
-  #coord_cartesian( ylim = c(-2.5, 2.5)) + 
+  coord_cartesian( ylim = c(-0.7, 0.7)) + 
   theme(
     axis.line = element_line("grey"), 
     panel.grid.major.y = element_line("grey"),
     panel.grid.major.x = element_blank(), # remove vertical white lines
     panel.background = element_rect("white"),
     axis.ticks.x = element_blank(), # remove x axis ticks
-    plot.title = element_text(size = 16),
+    panel.border = element_rect(fill=NA, "grey"),
+    plot.title = element_text(size = 16, face = "bold"),
     legend.key = element_blank(),
     legend.text = element_text(size = 12),
     axis.title.x = element_text(size = 14),
     axis.title.y = element_text(size = 14),
     axis.text = element_text(size = 12) #size of x axis labels
   ) +
-  labs(title = plot_title, x = "Time (min)", y = "Induced Current (A)") +
+  labs(title = plot_title, x = "Time (Days)", y = "Induced Current (A)") +
   scale_colour_manual(
-    values = c("grey", "red"), 
+    values = c("grey70", "red"), 
     name = "" ) +
   scale_size_manual(
-    values = c(1.2,0.7), 
+    values = c(1,0.7), 
     name = "")
   
   
+
+#coherence and coherence plot -----------
+
+real_data <- spec.mtm(test_data$A, nw=nw, k=k, returnInternals = TRUE, plot= FALSE)
+prediction_data <- spec.mtm(prediction, nw=nw, k=k, returnInternals = TRUE, plot=FALSE)
+
+resCoh <-mtm.coh(real_data, prediction_data)
+plot(resCoh)
+plot(resCoh$freq, resCoh$msc, type = "l")
+
+coherence <- data.frame(resCoh$freq,  resCoh$msc)
+colnames(coherence) <- c("freq", "msc")
+
+
+ggplot(data = coherence,aes(x= freq, y = msc)) +
+  geom_line()+
+  coord_cartesian( ylim = c(0, 1)) + 
+  theme(
+    axis.line = element_line("grey"), 
+    panel.grid.major.y = element_line("grey"),
+    panel.grid.major.x = element_blank(), # remove vertical white lines
+    panel.background = element_rect("white"),
+    axis.ticks = element_blank(), # remove x axis ticks
+    #panel.border = element_rect(fill=NA, "grey"),
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12) #size of x axis labels
+  ) +
+  labs(title = "Coherence between Measured and Predicted Current", x = "Frequency", y = "Mean Squared Coherence")
