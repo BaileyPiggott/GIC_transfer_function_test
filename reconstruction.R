@@ -157,6 +157,7 @@ for(j in 1:length(freq)){
 
 #cmv's of prediction -----------
 #complex mean values:
+k=7
 slep <- dpss(n = length(a_test), k = k, nw = 4, returnEigenvalues = FALSE)$v #slepian tapers
 
 U_kzero <- mvfft(slep)[1, ] # You only want the zeroeth frequency
@@ -217,5 +218,5 @@ par(mfrow=c(2,1))
 plot(a_train, type='l', col='grey', lwd=2, main="Reconstruction of Training Data")
 lines(fullRecon, col='blue')
 plot(a_test, type='l', col='grey', lwd=2, main="Reconstruction of Prediction on Testing Data")
-lines(pred_recon+cubeTrend, col='red')
+lines(pred_recon, col='red')
 

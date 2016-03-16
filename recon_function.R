@@ -36,6 +36,8 @@ reconstruct <- function(data, block_N, k, nw){ # main reconstruction function
   slep <- dpss(n = block_N, k = k, nw = nw, returnEigenvalues = FALSE)$v 
   
   U_kzero <- mvfft(slep)[1, ] # You only want the zeroeth frequency
+
+  sum_U_kzero <- sum(U_kzero^2)
   
   if (k >= 2){
     U_kzero[seq(2,k,2)] <- 0  # only want the even tapers... see P&W
