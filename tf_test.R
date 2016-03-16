@@ -56,7 +56,7 @@ train_data <- bad_day #uncomment to use bad day data as training data
 
 test_data <- data[test_data_low:test_data_high, ] #testing data frame based on chosen thresholds
 
-# # plot time domain data --------------------------
+## plot time domain data --------------------------
 # plot_sim <- data[11150:11520, ] %>% 
 #   mutate(time = (11150:11520)) %>% # add time column for plotting
 #   gather(type, val, H:A) # convert to long form to plot in facets
@@ -75,12 +75,6 @@ test_data <- data[test_data_low:test_data_high, ] #testing data frame based on c
 #   )
 
 # create spectral estimates --------------------
-
-# not using multitaper method
-#spec_H_block <- get_spec(train_data$H, block_N)
-#spec_D_block <- get_spec(train_data$D, block_N)
-#spec_Z_block <- get_spec(train_data$Z, block_N)
-#spec_A_block <- get_spec(train_data$A, block_N)
 
 #using multitaper method
 spec_H_block <- get_spec_mtm(train_data$H, nw, k, block_N) 
@@ -171,14 +165,38 @@ time_data <- bind_cols(measured, prediction)
 colnames(time_data) <- c('measured', 'predicted')
 time_data$index <- as.numeric(rownames(time_data))*15/60/24 #data is in 15 minute intervals
 
-time_data <- time_data %>% gather("type", "a", measured:predicted)
-time_data <- as.data.frame(time_data)
+plot_data <- time_data %>% gather("type", "a", measured:predicted)
+plot_data <- as.data.frame(plot_data)
+
+#mean squared error ------------------
+
+square_error <- time_data %>% transmute((measured-predicted)^2) #squared error of each row
+mse <- sum(square_error)/nrow(square_error)
+
+A_avg <- sum(time_data$measured)/nrow(time_data)
+
+#count correctly predicted peaks------------
+peak_threshold = 0.25 #min amps to be considered a 'peak'
+
+peaks <- which(abs(time_data$measured) > peak_threshold ) # find indices of peaks in training data
+
+j=0
+for (i in 2:length(peaks)){
+  if(abs(time_data$predicted[i]) > peak_threshold )
+    j=j+1 
+  else if(abs(time_data$predicted[i-1]) > peak_threshold )
+    j=j+1 
+  else if(abs(time_data$predicted[i+1]) > peak_threshold)
+    j=j+1 
+}
+
+accuracy <- j/length(peaks) #percentage of peaks detected
 
 #plot ---------------
 
-plot_title = paste0("Measured Current vs. Predicted")
+plot_title = paste0("Measured Current vs. Predicted\nMSE = ", round(mse, digits = 4))
 
-ggplot(data = time_data,aes(x= index, y = a, colour = type, size = type)) +
+ggplot(data = plot_data,aes(x= index, y = a, colour = type, size = type)) +
   geom_line()+
   coord_cartesian( ylim = c(-0.7, 0.7)) + 
   theme(
@@ -202,34 +220,4 @@ ggplot(data = time_data,aes(x= index, y = a, colour = type, size = type)) +
   scale_size_manual(
     values = c(1,0.7), 
     name = "")
-  
-  
 
-#coherence and coherence plot -----------
-
-real_data <- spec.mtm(test_data$A, nw=nw, k=k, returnInternals = TRUE, plot= FALSE)
-prediction_data <- spec.mtm(prediction, nw=nw, k=k, returnInternals = TRUE, plot=FALSE)
-
-resCoh <-mtm.coh(real_data, prediction_data)
-plot(resCoh)
-plot(resCoh$freq, resCoh$msc, type = "l")
-
-coherence <- data.frame(resCoh$freq,  resCoh$msc)
-colnames(coherence) <- c("freq", "msc")
-
-
-ggplot(data = coherence,aes(x= freq, y = msc)) +
-  geom_line()+
-  coord_cartesian( ylim = c(0, 1)) + 
-  theme(
-    axis.line = element_line("grey"), 
-    panel.grid.major.y = element_line("grey"),
-    panel.grid.major.x = element_blank(), # remove vertical white lines
-    panel.background = element_rect("white"),
-    axis.ticks = element_blank(), # remove x axis ticks
-    #panel.border = element_rect(fill=NA, "grey"),
-    plot.title = element_text(size = 16, face = "bold"),
-    axis.title = element_text(size = 14),
-    axis.text = element_text(size = 12) #size of x axis labels
-  ) +
-  labs(title = "Coherence between Measured and Predicted Current", x = "Frequency", y = "Mean Squared Coherence")
