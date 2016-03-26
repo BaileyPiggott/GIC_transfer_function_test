@@ -15,18 +15,8 @@ source('get_tf.R') # function to generate transfer function
 source('get_tf_all.R')
 source('recon_function.R')
 
-# parameters to adjust ----------
-block_N = 500 # number of data points per block; 
-# *****N MUST be a factor of number of samples in test data***
-
-current_threshold <- 1 #for "bad day" data
-test_data_low <- 3001
-test_data_high <- 3500 #interval of testing data
-
-nw <- 4
-k <- 7
-
-#get data and separate into training and testing -----------------
+#load data----------
+current_threshold <- 1
 
 geomag <- readRDS("boulder_1999-2012_15min_final.rds")
 inducedCurrent <- readRDS("inducedCurrent-1999-2012-15min.rds")
@@ -34,25 +24,42 @@ inducedCurrent <- readRDS("inducedCurrent-1999-2012-15min.rds")
 data <- inner_join(geomag, inducedCurrent, by = "date") %>% select(X,Y,Z,value)
 colnames(data) <- c("H", "D", "Z", "A")
 
-bad_day <- as.data.frame(matrix(nrow = length(data), ncol = 4)) #initalize "bad day data"
+# bad_day <- as.data.frame(matrix(nrow = length(data), ncol = 4)) #initalize "bad day data"
+# 
+# j=1;
+# for (i in 1:nrow(data)){
+#   
+#   if(data$A[i] > current_threshold){
+#     bad_day[j, ] = data[i-1, ]
+#     j=j+1
+#     bad_day[j,] = data[i, ]
+#     j=j+1
+#     bad_day[j,] = data[i+1, ]
+#     j=j+1
+#   }
+# }
+# colnames(bad_day) <- colnames(data)
 
-j=1;
-for (i in 1:nrow(data)){
-  
-  if(data$A[i] > current_threshold){
-    bad_day[j, ] = data[i-1, ]
-    j=j+1
-    bad_day[j,] = data[i, ]
-    j=j+1
-    bad_day[j,] = data[i+1, ]
-    j=j+1
-  }
-}
-colnames(bad_day) <- colnames(data)
+#parameters to adjust ----------
+block_N = 5000 # number of data points per block; 
+# *****N MUST be a factor of number of samples in test data***
 
-#choose training data:
-train_data <- bad_day #uncomment to use bad day data as training data
-#train_data <-data[4000:14068, ] #uncomment to use random data block as training data
+test_data_low <- 12001
+test_data_high <- 22000 #interval of testing data
+
+train_data_low <- 1
+train_data_high <- 12000
+
+nw <- 4
+k <- 5
+
+peak_threshold_1 = 0.25 #min amps to be considered a 'peak'
+peak_threshold_2 = 0.5 #min amps to be considered a 'peak'
+
+#separate into training and testing -----------------
+
+#train_data <- bad_day #uncomment to use bad day data as training data
+train_data <-data[train_data_low:train_data_high, ] #uncomment to use random data block as training data
 
 test_data <- data[test_data_low:test_data_high, ] #testing data frame based on chosen thresholds
 
@@ -87,7 +94,7 @@ freq <- seq(1,nrow(spec_H_block),1) # frequencies at which to calculate the tran
 
 tf <- get_tf_all(spec_H_block, spec_D_block, spec_Z_block, spec_A_block, freq)
 
-## plot transfer function --------------
+# # plot transfer function --------------
 # # convert transfer function to matrix for graphing
 # p=1/2*nrow(tf)
 # mag <- abs(tf)
@@ -107,7 +114,7 @@ tf <- get_tf_all(spec_H_block, spec_D_block, spec_Z_block, spec_A_block, freq)
 #   facet_grid(type~component, scale = "free_y") +
 #   geom_line() +
 #   stat_smooth(method = "loess", formula = y ~ x, size = 0., se = "FALSE", colour = "red") +
-#   labs(title = paste0("Transfer Functions\nNumber of Blocks = ", (nrow(data)-1)/(2*block_N)), x = "Frequency", y = "")+
+#   labs(title = paste0("Transfer Functions\nNumber of Blocks = ", (nrow(test_data)-1)/(2*block_N)), x = "Frequency", y = "")+
 #   theme(
 #     title = element_text(size = 13),
 #     axis.text = element_text(size  =10),
@@ -176,29 +183,44 @@ mse <- sum(square_error)/nrow(square_error)
 A_avg <- sum(time_data$measured)/nrow(time_data)
 
 #count correctly predicted peaks------------
-peak_threshold = 0.25 #min amps to be considered a 'peak'
 
-peaks <- which(abs(time_data$measured) > peak_threshold ) # find indices of peaks in training data
+peaks_1 <- which(abs(time_data$measured) > peak_threshold_1 ) # find indices of peaks in training data
 
 j=0
-for (i in 2:length(peaks)){
-  if(abs(time_data$predicted[i]) > peak_threshold )
+for (i in 2:length(peaks_1)){
+  if(abs(time_data$predicted[peaks_1[i]]) > peak_threshold_1 )
     j=j+1 
-  else if(abs(time_data$predicted[i-1]) > peak_threshold )
+  else if(abs(time_data$predicted[peaks_1[i]-1]) > peak_threshold_1 )
     j=j+1 
-  else if(abs(time_data$predicted[i+1]) > peak_threshold)
+  else if(abs(time_data$predicted[peaks_1[i]+1]) > peak_threshold_1)
     j=j+1 
 }
 
-accuracy <- j/length(peaks) #percentage of peaks detected
+accuracy_1 <- j/length(peaks_1) #percentage of peaks detected for 1st threshold
+
+#second threshold_2
+peaks_2 <- which(abs(time_data$measured) > peak_threshold_2 ) # find indices of peaks in training data
+
+m=0
+for (i in 2:length(peaks_2)){
+  if(abs(time_data$predicted[peaks_2[i]]) > peak_threshold_2 )
+    m=m+1 
+  else if(abs(time_data$predicted[peaks_2[i]-1]) > peak_threshold_2 )
+    m=m+1 
+  else if(abs(time_data$predicted[peaks_2[i]+1]) > peak_threshold_2)
+    m=m+1 
+}
+
+accuracy_2 <- m/length(peaks_2) #percentage of peaks detected
 
 #plot ---------------
 
-plot_title = paste0("Measured Current vs. Predicted\nMSE = ", round(mse, digits = 4))
+#plot_title = paste0("Measured Current vs. Predicted\nMSE = ", round(mse, digits = 4))
+plot_title = paste0("Measured Current vs. Predicted")
 
 ggplot(data = plot_data,aes(x= index, y = a, colour = type, size = type)) +
   geom_line()+
-  coord_cartesian( ylim = c(-0.7, 0.7)) + 
+  coord_cartesian( xlim = c(21, 23.5), ylim = c(-1, 1)) +
   theme(
     axis.line = element_line("grey"), 
     panel.grid.major.y = element_line("grey"),
@@ -221,3 +243,8 @@ ggplot(data = plot_data,aes(x= index, y = a, colour = type, size = type)) +
     values = c(1,0.7), 
     name = "")
 
+#print parameters -----
+
+print(mse)
+print(accuracy_1)
+print(accuracy_2)
