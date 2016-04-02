@@ -1,26 +1,25 @@
-# function to generate spectral estimate of data
+# function to block data and then generate spectral estimate 
 
 get_spec_mtm <- function(data, nw, k, block_length){
   #input data is a vector; N is block length
-  # generally, nw = 4, k = 7
+  #nw and k are the timebandwidth parameter and the number of tapers, respectively
   
   N <- block_length
-  
-  blocks <- matrix(ncol = length(data)/N, nrow = N)
+  blocks <- matrix(ncol = length(data)/N, nrow = N) #initialize empty data blocks
   
   for(j in 1:ncol(blocks)){
-    blocks[,j]<- data[(1+(j-1)*N):(j*N)]
+    blocks[,j]<- data[(1+(j-1)*N):(j*N)] #each column is a block of data of length N
   }
   
-  # get spectral estimate for each column -------
+  # get spectral estimate for each column(block) -------
   
-  nFFT <- 2^(floor(log2(N)) + 3) 
-  spec <- matrix(nrow = nFFT, ncol = k * ncol(blocks))
+  nFFT <- 2^(floor(log2(N)) + 3) #for zero-padding 
+  spec <- matrix(nrow = nFFT, ncol = k * ncol(blocks)) #initialize empty matrix for spectral estimate
   
   for(i in 1:(ncol(blocks))){
     
-    # this is for zero-padding - you can change the 3 to whatever you want, but 2 or 3 is usually fine
     data <- blocks[,i]
+    
     # generate the slepians (the $v will just return the matrix)
     slep <- dpss(n=N, k=k, nw=nw, returnEigenvalues=FALSE)$v
     
@@ -36,8 +35,5 @@ get_spec_mtm <- function(data, nw, k, block_length){
     spec[,((i-1)*k+1):(i*k)] <- y_k
     
   }
-  
-  return(spec)
-  
-  
+  return(spec)  
 }

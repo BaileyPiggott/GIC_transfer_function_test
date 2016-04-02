@@ -2,12 +2,11 @@
 # convert predictions from the frequency domain back to time domain
 
 
-prediction_fmax <- function(ftest, k, cutoff){# fmax function
-  #needed for reconstruction
+prediction_fmax <- function(ftest, k, cutoff){# fmax function needed for reconstruction
   
   Fval <- ftest
   
-  fMaxInd <- which(Fval > qf(cutoff, 2, 2*k))
+  fMaxInd <- which(Fval > qf(cutoff, 2, 2*k))#which frequencies are above confidence interval
   maxes <- c()
   
   if (length(fMaxInd) == 0){
@@ -27,6 +26,7 @@ prediction_fmax <- function(ftest, k, cutoff){# fmax function
   
   maxes
 }
+
 
 reconstruct <- function(data, block_N, k, nw){ # main reconstruction function
   #need length of time domain block, nw, and k to generate slepians
